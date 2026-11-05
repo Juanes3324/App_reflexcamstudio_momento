@@ -308,11 +308,26 @@ class _LoginScreenState extends State<LoginScreen> {
           },
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showMessage('Escríbenos por WhatsApp.'),
-        backgroundColor: ReflexColors.orange,
-        foregroundColor: const Color(0xFF17120E),
-        child: const Icon(Icons.chat_rounded),
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: ReflexColors.orange.withValues(alpha: 0.28),
+              blurRadius: 16,
+              spreadRadius: 1,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: FloatingActionButton(
+          onPressed: () => _showMessage('Escríbenos por WhatsApp.'),
+          backgroundColor: ReflexColors.orange,
+          foregroundColor: const Color(0xFF17120E),
+          elevation: 0,
+          highlightElevation: 1,
+          child: const Icon(Icons.chat_rounded),
+        ),
       ),
     );
   }

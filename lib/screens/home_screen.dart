@@ -251,6 +251,10 @@ class _HeroCard extends StatelessWidget {
                       style: FilledButton.styleFrom(
                         backgroundColor: ReflexColors.orange,
                         foregroundColor: const Color(0xFF17120E),
+                        elevation: 6,
+                        shadowColor: ReflexColors.orange.withValues(
+                          alpha: 0.38,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),

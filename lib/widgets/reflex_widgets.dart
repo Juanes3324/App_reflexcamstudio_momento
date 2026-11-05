@@ -90,38 +90,55 @@ class PrimaryButton extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       height: height,
-      child: FilledButton(
-        onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: ReflexColors.orange,
-          foregroundColor: const Color(0xFF17120E),
-          disabledBackgroundColor: ReflexColors.orange.withValues(alpha: 0.35),
-          disabledForegroundColor: ReflexColors.text.withValues(alpha: 0.55),
-          elevation: 5,
-          shadowColor: ReflexColors.orange.withValues(alpha: 0.3),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(17),
-          ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(17),
+          boxShadow: onPressed == null
+              ? null
+              : [
+                  BoxShadow(
+                    color: ReflexColors.orange.withValues(alpha: 0.24),
+                    blurRadius: 18,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Flexible(
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.65,
+        child: FilledButton(
+          onPressed: onPressed,
+          style: FilledButton.styleFrom(
+            backgroundColor: ReflexColors.orange,
+            foregroundColor: const Color(0xFF17120E),
+            disabledBackgroundColor: ReflexColors.orange.withValues(
+              alpha: 0.35,
+            ),
+            disabledForegroundColor: ReflexColors.text.withValues(alpha: 0.55),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(17),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.65,
+                  ),
                 ),
               ),
-            ),
-            if (icon != null) ...[
-              const SizedBox(width: 8),
-              Icon(icon, size: 19),
+              if (icon != null) ...[
+                const SizedBox(width: 8),
+                Icon(icon, size: 19),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
