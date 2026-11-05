@@ -20,15 +20,17 @@ class _BookingScreenState extends State<BookingScreen> {
   String _location = 'Estudio Reflexcam';
   bool _termsAccepted = false;
   bool _sent = false;
+  bool _assistantRequired = true;
   final Set<String> _selectedServices = {'Fotografía de Producto & Branding'};
   final Set<String> _selectedExtras = {};
   final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _logisticsController = TextEditingController();
 
   static const _services = [
     _BookingService(
       category: 'Foto estudio',
       title: 'Fotografía de Producto & Branding',
-      description: 'Tarifas en alta resolución para ecommerce, catálogo y redes sociales.',
+      description: 'Tomas en alta resolución para ecommerce, catálogo y redes con calibración de color, iluminación estroboscópica y tethering en vivo.',
       deliverable: '30 fotos retocadas',
       price: 350000,
       icon: Icons.camera_alt_outlined,
@@ -37,8 +39,7 @@ class _BookingScreenState extends State<BookingScreen> {
     _BookingService(
       category: 'Video 4K / 60P',
       title: 'Video Promocional & Reels',
-      description:
-          'Producción audiovisual y reels verticales listos para redes.',
+      description: 'Producción audiovisual y reels verticales 9:16 cinematográficos, etalonaje profesional y optimización para anuncios de alto impacto.',
       deliverable: '3 formatos editados',
       price: 200000,
       icon: Icons.videocam_outlined,
@@ -47,8 +48,7 @@ class _BookingScreenState extends State<BookingScreen> {
     _BookingService(
       category: 'Multicámara',
       title: 'Cobertura de Evento',
-      description:
-          'Registro documental de congresos, pasarelas y lanzamientos.',
+      description: 'Registro documental de congresos, pasarelas y lanzamientos de producto con entrega express para prensa y comunicación digital.',
       deliverable: 'Galería digital rápida',
       price: 250000,
       icon: Icons.bolt_outlined,
@@ -57,8 +57,7 @@ class _BookingScreenState extends State<BookingScreen> {
     _BookingService(
       category: 'Director de arte',
       title: 'Lookbook & Moda Editorial',
-      description:
-          'Modelos, estilismo y scouting de locación para tu colección.',
+      description: 'Dirección de arte completa, modelos, estilismo y scouting de locación enfocado en colecciones de temporada y campañas editoriales.',
       deliverable: 'Full production pack',
       price: 250000,
       icon: Icons.copy_all_outlined,
@@ -126,6 +125,7 @@ class _BookingScreenState extends State<BookingScreen> {
   @override
   void dispose() {
     _addressController.dispose();
+    _logisticsController.dispose();
     super.dispose();
   }
 
@@ -144,15 +144,44 @@ class _BookingScreenState extends State<BookingScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ScreenHeader(
-                  eyebrow: 'Servicios y gestión de sesiones',
-                  title: _stepTitle,
-                  subtitle: _stepSubtitle,
+                _BookingHeader(
+                  step: _step,
+                  onBack: _step == 0
+                      ? widget.onComplete
+                      : () => setState(() => _step--),
+                  onClose: widget.onComplete,
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 17),
+                  padding: const EdgeInsets.fromLTRB(20, 9, 20, 13),
                   child: _ProgressHeader(currentStep: _step),
                 ),
+                if (_step == 0)
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 4, 20, 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Selecciona tu servicio',
+                          style: TextStyle(
+                            color: ReflexColors.text,
+                            fontSize: 23,
+                            height: 1.15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        SizedBox(height: 7),
+                        Text(
+                          'Elige el tipo de producción que requiere tu marca o proyecto comercial.',
+                          style: TextStyle(
+                            color: ReflexColors.muted,
+                            fontSize: 12,
+                            height: 1.45,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: _buildStepContent(),
@@ -165,20 +194,6 @@ class _BookingScreenState extends State<BookingScreen> {
       ],
     );
   }
-
-  String get _stepTitle => switch (_step) {
-    0 => 'Selecciona tu servicio',
-    1 => 'Fecha y disponibilidad',
-    2 => 'Ubicación de la sesión',
-    _ => 'Resumen de tu reserva',
-  };
-
-  String get _stepSubtitle => switch (_step) {
-    0 => 'Elige los servicios que mejor se ajustan a tu proyecto.',
-    1 => 'Selecciona el día y el horario de tu sesión.',
-    2 => 'Cuéntanos dónde y cómo quieres producir.',
-    _ => 'Revisa los detalles antes de enviar tu solicitud.',
-  };
 
   Widget _buildStepContent() {
     return switch (_step) {
@@ -266,12 +281,29 @@ class _BookingScreenState extends State<BookingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _SelectedSessionCard(
+          title: _services
+              .firstWhere(
+                (service) => _selectedServices.contains(service.title),
+                orElse: () => _services.first,
+              )
+              .title,
+          stepLabel: 'SERVICIO SELECCIONADO',
+          trailing: '4H ESTUDIO',
+        ),
+        const SizedBox(height: 13),
         SurfaceCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
+                  const Icon(
+                    Icons.calendar_month_outlined,
+                    color: ReflexColors.orange,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '$_monthName ${_displayedMonth.year}',
@@ -405,70 +437,79 @@ class _BookingScreenState extends State<BookingScreen> {
               ),
             ),
             Text(
-              '$_selectedWeekday $_selectedDay',
-              style: const TextStyle(color: ReflexColors.muted, fontSize: 10),
+              '· $_selectedWeekday $_selectedDay',
+              style: const TextStyle(color: ReflexColors.muted, fontSize: 11),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'TACHADO = OCUPADO',
+              style: TextStyle(
+                color: ReflexColors.muted,
+                fontSize: 8,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
+              ),
             ),
           ],
         ),
         const SizedBox(height: 10),
-        Wrap(
-          spacing: 9,
-          runSpacing: 9,
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 3,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: 2.15,
           children: [
-            for (final time in ['09:00', '10:00', '14:00', '15:00', '16:00'])
-              ChoiceChip(
-                label: Text(time),
-                selected: time == _selectedTime,
-                onSelected: (_) => setState(() => _selectedTime = time),
-                showCheckmark: false,
-                labelStyle: TextStyle(
-                  color: time == _selectedTime
-                      ? const Color(0xFF17120E)
-                      : ReflexColors.text,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                ),
-                selectedColor: ReflexColors.orange,
-                backgroundColor: ReflexColors.surface,
-                side: BorderSide(
-                  color: time == _selectedTime
-                      ? ReflexColors.orange
-                      : ReflexColors.line,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+            for (final slot in [
+              (time: '08:00', busy: true),
+              (time: '09:00', busy: false),
+              (time: '10:00', busy: false),
+              (time: '14:00', busy: true),
+              (time: '15:00', busy: false),
+              (time: '16:00', busy: false),
+            ])
+              _TimeSlot(
+                time: slot.time,
+                selected: slot.time == _selectedTime,
+                busy: slot.busy,
+                onTap: slot.busy
+                    ? null
+                    : () => setState(() => _selectedTime = slot.time),
               ),
           ],
         ),
         const SizedBox(height: 14),
         SurfaceCard(
           padding: const EdgeInsets.all(13),
-          child: const Row(
+          child: Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.info_outline_rounded,
-                size: 17,
+                size: 18,
                 color: ReflexColors.muted,
               ),
-              SizedBox(width: 9),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text.rich(
                   TextSpan(
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: ReflexColors.muted,
-                      fontSize: 10,
+                      fontSize: 11,
                       height: 1.4,
                     ),
                     children: [
-                      TextSpan(text: '¿No encuentras un horario conveniente? '),
+                      const TextSpan(
+                        text: '¿No encuentras un horario conveniente para tu equipo? ',
+                      ),
                       TextSpan(
                         text: 'Escríbenos por WhatsApp',
-                        style: TextStyle(
-                          color: ReflexColors.orangeLight,
-                          fontWeight: FontWeight.w700,
+                        style: const TextStyle(
+                          color: ReflexColors.orange,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
+                      const TextSpan(text: ' ↗'),
                     ],
                   ),
                 ),
@@ -484,137 +525,138 @@ class _BookingScreenState extends State<BookingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SurfaceCard(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Eyebrow('Elige el tipo de producción'),
-              const SizedBox(height: 12),
-              _LocationChoice(
-                icon: Icons.apartment_outlined,
-                label: 'En Estudio Reflexcam',
-                selected: _location == 'Estudio Reflexcam',
-                onTap: () => setState(() => _location = 'Estudio Reflexcam'),
+        _SelectedSessionCard(
+          title:
+              'Fotografía de Producto · $_selectedWeekday $_selectedDay Oct, $_selectedTime AM',
+          stepLabel: 'SESIÓN CONFIRMADA',
+          trailing: '4H ESTUDIO',
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Ubicación de la Sesión',
+                style: Theme.of(context).textTheme.titleLarge
+                    ?.copyWith(fontSize: 23, height: 1.25),
               ),
-              const SizedBox(height: 9),
-              _LocationChoice(
-                icon: Icons.storefront_outlined,
-                label: 'En mi negocio / Locación',
-                selected: _location == 'Mi negocio / Locación',
-                onTap: () =>
-                    setState(() => _location = 'Mi negocio / Locación'),
-              ),
-              if (_location == 'Mi negocio / Locación') ...[
-                const SizedBox(height: 13),
-                TextField(
-                  controller: _addressController,
-                  decoration: const InputDecoration(
-                    hintText: 'Dirección de la locación',
-                    prefixIcon: Icon(Icons.location_on_outlined, size: 19),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Bogotá, Colombia · La ubicación se confirma con el equipo.',
-                  style: TextStyle(
-                    color: ReflexColors.muted,
-                    fontSize: 10,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ],
+            ),
+            const TagPill('Logística'),
+          ],
+        ),
+        const SizedBox(height: 5),
+        const Text(
+          'Elige el espacio ideal para el despliegue del equipo técnico.',
+          style: TextStyle(
+            color: ReflexColors.muted,
+            fontSize: 12,
+            height: 1.45,
           ),
         ),
+        const SizedBox(height: 14),
+        _LocationDetailCard(
+          selected: _location == 'Estudio Reflexcam',
+          icon: Icons.storefront_outlined,
+          title: 'Estudio Reflexcam',
+          badge: 'RECOMENDADO',
+          subtitle: 'Estudio Central · Calle 93 # 12-40, Piso 3',
+          detail: 'Ciclorama blanco, iluminación Profoto y set de producto equipado incluido.',
+          onTap: () => setState(() => _location = 'Estudio Reflexcam'),
+        ),
+        const SizedBox(height: 12),
+        _LocationDetailCard(
+          selected: _location == 'Mi negocio / Locación',
+          icon: Icons.apartment_rounded,
+          title: 'En mi negocio o locación externa',
+          subtitle: 'Desplazamiento del equipo técnico a tu sede u oficina.',
+          detail: 'Incluye montaje portátil de luces y tethering en vivo para clientes en Bogotá D.C.',
+          onTap: () => setState(() => _location = 'Mi negocio / Locación'),
+        ),
+        if (_location == 'Mi negocio / Locación') ...[
+          const SizedBox(height: 10),
+          TextField(
+            controller: _addressController,
+            decoration: const InputDecoration(
+              hintText: 'Dirección de la locación',
+              prefixIcon: Icon(Icons.location_on_outlined, size: 19),
+            ),
+          ),
+        ],
         const SizedBox(height: 13),
+        const _StudioMapPreview(),
+        const SizedBox(height: 14),
         SurfaceCard(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(15),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Row(
                 children: [
                   Icon(
-                    Icons.auto_awesome_outlined,
+                    Icons.subject_rounded,
                     color: ReflexColors.orange,
                     size: 18,
                   ),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Servicios adicionales',
+                      'Indicaciones de acceso y logística especial',
                       style: TextStyle(
                         color: ReflexColors.text,
+                        fontSize: 14,
+                        height: 1.3,
                         fontWeight: FontWeight.w800,
-                        fontSize: 13,
                       ),
                     ),
                   ),
-                  Eyebrow('Opcional'),
                 ],
               ),
-              const SizedBox(height: 5),
-              const Text(
-                'Personaliza tu producción.',
-                style: TextStyle(color: ReflexColors.muted, fontSize: 11),
-              ),
-              const SizedBox(height: 7),
-              for (final extra in _extras)
-                Material(
-                  color: Colors.transparent,
-                  child: CheckboxListTile(
-                    value: _selectedExtras.contains(extra.$1),
-                    onChanged: (selected) => setState(() {
-                      if (selected ?? false) {
-                        _selectedExtras.add(extra.$1);
-                      } else {
-                        _selectedExtras.remove(extra.$1);
-                      }
-                    }),
-                    title: Text(
-                      extra.$1,
-                      style: const TextStyle(
-                        color: ReflexColors.text,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    subtitle: Text(
-                      '+ \$${_formatPrice(extra.$2)}',
-                      style: const TextStyle(
-                        color: ReflexColors.muted,
-                        fontSize: 10,
-                      ),
-                    ),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    visualDensity: VisualDensity.compact,
-                    activeColor: ReflexColors.orange,
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 13),
-        SurfaceCard(
-          child: const Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.info_outline_rounded,
-                color: ReflexColors.orange,
-                size: 18,
-              ),
-              SizedBox(width: 11),
-              Expanded(
-                child: Text(
-                  '¿Requieres asistente de estilismo o iluminación extra? Puedes añadir extras en este paso o conversar con el director técnico.',
-                  style: TextStyle(
+              const SizedBox(height: 10),
+              TextField(
+                controller: _logisticsController,
+                minLines: 2,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Ej: Traeremos 2 modelos, productos frágiles de cristalería, requerimos zona de parqueadero de carga o refrigerador para bebidas...',
+                  hintStyle: const TextStyle(
                     color: ReflexColors.muted,
                     fontSize: 11,
                     height: 1.5,
+                  ),
+                  fillColor: ReflexColors.background,
+                  contentPadding: const EdgeInsets.all(13),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: ReflexColors.line),
+                  ),
+                ),
+              ),
+              const Divider(color: ReflexColors.line, height: 22),
+              Material(
+                color: Colors.transparent,
+                child: CheckboxListTile(
+                  value: _assistantRequired,
+                  onChanged: (value) =>
+                      setState(() => _assistantRequired = value ?? false),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  activeColor: ReflexColors.orange,
+                  title: const Text(
+                    '¿Requieres asistente de estilismo o iluminación extra?',
+                    style: TextStyle(
+                      color: ReflexColors.text,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Incluye apoyo técnico de calibración y setup de colorímetro X-Rite.',
+                    style: TextStyle(
+                      color: ReflexColors.muted,
+                      fontSize: 10,
+                      height: 1.4,
+                    ),
                   ),
                 ),
               ),
@@ -626,42 +668,91 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Widget _buildSummary() {
-    final deposit = (_total / 2).round();
+    final deposit = (_total * 0.5).round();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const Padding(
+          padding: EdgeInsets.only(bottom: 10),
+          child: Text(
+            'Resumen de tu reserva',
+            style: TextStyle(
+              color: ReflexColors.text,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              height: 1.1,
+            ),
+          ),
+        ),
         SurfaceCard(
+          padding: const EdgeInsets.all(15),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Eyebrow('Detalles de la sesión'),
-              const SizedBox(height: 15),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.fact_check_outlined,
+                    color: ReflexColors.orange,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(child: Eyebrow('Detalles de la sesión')),
+                  TextButton.icon(
+                    onPressed: () => setState(() => _step = 0),
+                    icon: const Icon(Icons.edit_outlined, size: 14),
+                    label: const Text('Editar'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: ReflexColors.orange,
+                      textStyle: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(color: ReflexColors.line, height: 18),
               _SummaryRow(
                 icon: Icons.camera_alt_outlined,
-                label: 'Servicio(s)',
-                value: _selectedServices.join(', '),
+                label: 'Servicio',
+                value: _selectedServices.isEmpty
+                    ? _services.first.title
+                    : _selectedServices.join(', '),
+                detail: '4H ESTUDIO  ·  HASTA 30 FOTOS RAW  ·  COLOR GRADING',
               ),
-              const Divider(color: ReflexColors.line, height: 25),
+              const Divider(color: ReflexColors.line, height: 20),
               _SummaryRow(
                 icon: Icons.calendar_month_outlined,
                 label: 'Fecha y hora',
                 value:
-                    '$_selectedWeekday $_selectedDay de $_monthName · $_selectedTime',
+                    '$_selectedWeekday $_selectedDay de $_monthName, ${_displayedMonth.year}',
+                detail: '$_selectedTime AM (GMT-5) · Duración estimada 4h',
               ),
-              const Divider(color: ReflexColors.line, height: 25),
+              const Divider(color: ReflexColors.line, height: 20),
               _SummaryRow(
                 icon: Icons.location_on_outlined,
                 label: 'Lugar',
-                value: _location,
+                value: _location == 'Estudio Reflexcam'
+                    ? 'Estudio Reflexcam'
+                    : _addressController.text.isEmpty
+                    ? 'Mi negocio / Locación'
+                    : _addressController.text,
+                detail: _location == 'Estudio Reflexcam'
+                    ? 'Calle 93 # 12-40, Piso 3 · Bogotá, Colombia'
+                    : 'Bogotá, Colombia',
               ),
               if (_selectedExtras.isNotEmpty) ...[
-                const Divider(color: ReflexColors.line, height: 25),
+                const Divider(color: ReflexColors.line, height: 20),
                 _SummaryRow(
                   icon: Icons.auto_awesome_outlined,
                   label: 'Adicionales',
                   value: _selectedExtras.join(', '),
                 ),
               ],
+              const SizedBox(height: 11),
+              const _StudioMapPreview(compact: true),
             ],
           ),
         ),
@@ -670,8 +761,19 @@ class _BookingScreenState extends State<BookingScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Eyebrow('Resumen económico'),
-              const SizedBox(height: 13),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.payments_outlined,
+                    color: ReflexColors.orange,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(child: Eyebrow('Resumen económico')),
+                  const TagPill('ANTICIPO 50%'),
+                ],
+              ),
+              const Divider(color: ReflexColors.line, height: 20),
               _PriceRow(label: 'Total de producción', value: _total),
               const SizedBox(height: 10),
               Container(
@@ -719,7 +821,7 @@ class _BookingScreenState extends State<BookingScreen> {
               ),
               const SizedBox(height: 13),
               const Text(
-                'Transferencia bancaria, PSE o tarjeta. El saldo restante se cancela antes de la sesión.',
+                'Transferencia bancaria, PSE o tarjeta de crédito. Puedes adjuntar tu comprobante ahora o después de reservar desde tu panel.',
                 style: TextStyle(
                   color: ReflexColors.muted,
                   fontSize: 10,
@@ -837,6 +939,450 @@ class _BookingService {
   final String tag;
 }
 
+class _BookingHeader extends StatelessWidget {
+  const _BookingHeader({
+    required this.step,
+    required this.onBack,
+    required this.onClose,
+  });
+
+  final int step;
+  final VoidCallback onBack;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(13, 9, 13, 10),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 36,
+            child: Row(
+              children: [
+                TextButton.icon(
+                  onPressed: onBack,
+                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                  label: const Text('Atrás'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: ReflexColors.text,
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                const Text('🦅', style: TextStyle(fontSize: 22)),
+                const SizedBox(width: 6),
+                const Text(
+                  'REFLEXCAM',
+                  style: TextStyle(
+                    color: ReflexColors.text,
+                    fontSize: 13,
+                    letterSpacing: 1.4,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: onClose,
+                  tooltip: 'Cerrar',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.close_rounded, size: 19),
+                  style: IconButton.styleFrom(
+                    backgroundColor: ReflexColors.surface,
+                    foregroundColor: ReflexColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Eyebrow('PASO 0${step + 1} / 04', color: ReflexColors.orange),
+          const SizedBox(height: 3),
+          const Text(
+            'AGENDAR SESIÓN',
+            style: TextStyle(
+              color: ReflexColors.text,
+              fontSize: 23,
+              height: 1.2,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const Divider(color: ReflexColors.line, height: 15),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectedSessionCard extends StatelessWidget {
+  const _SelectedSessionCard({
+    required this.title,
+    required this.stepLabel,
+    required this.trailing,
+  });
+
+  final String title;
+  final String stepLabel;
+  final String trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: const BoxDecoration(
+              color: ReflexColors.background,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.camera_alt_rounded,
+              color: ReflexColors.orange,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Eyebrow(stepLabel),
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: ReflexColors.text,
+                    fontSize: 13,
+                    height: 1.3,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TagPill(trailing),
+        ],
+      ),
+    );
+  }
+}
+
+class _TimeSlot extends StatelessWidget {
+  const _TimeSlot({
+    required this.time,
+    required this.selected,
+    required this.busy,
+    required this.onTap,
+  });
+
+  final String time;
+  final bool selected;
+  final bool busy;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? ReflexColors.orange : ReflexColors.surface,
+      borderRadius: BorderRadius.circular(28),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(28),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color: selected ? ReflexColors.orange : ReflexColors.line,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (selected) ...[
+                const Icon(
+                  Icons.check_rounded,
+                  color: Color(0xFF17120E),
+                  size: 14,
+                ),
+                const SizedBox(width: 3),
+              ],
+              Text(
+                time,
+                style: TextStyle(
+                  color: selected
+                      ? const Color(0xFF17120E)
+                      : busy
+                      ? ReflexColors.muted.withValues(alpha: 0.35)
+                      : ReflexColors.text,
+                  decoration: busy ? TextDecoration.lineThrough : null,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LocationDetailCard extends StatelessWidget {
+  const _LocationDetailCard({
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.detail,
+    required this.onTap,
+    this.badge,
+  });
+
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String detail;
+  final String? badge;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: ReflexColors.surface,
+      borderRadius: BorderRadius.circular(38),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(38),
+        child: Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(38),
+            border: Border.all(
+              color: selected ? ReflexColors.orange : ReflexColors.line,
+              width: selected ? 1.2 : 0.9,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 37,
+                height: 37,
+                decoration: const BoxDecoration(
+                  color: ReflexColors.surfaceRaised,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: ReflexColors.orange, size: 17),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              color: ReflexColors.text,
+                              fontSize: 15,
+                              height: 1.3,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (selected)
+                          const Icon(
+                            Icons.check_circle,
+                            color: ReflexColors.orange,
+                            size: 19,
+                          ),
+                      ],
+                    ),
+                    if (badge != null) ...[
+                      const SizedBox(height: 5),
+                      TagPill(badge!),
+                    ],
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: ReflexColors.muted,
+                        fontSize: 12,
+                        height: 1.45,
+                      ),
+                    ),
+                    const Divider(color: ReflexColors.line, height: 17),
+                    Text(
+                      detail,
+                      style: const TextStyle(
+                        color: ReflexColors.muted,
+                        fontSize: 10,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StudioMapPreview extends StatelessWidget {
+  const _StudioMapPreview({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(30),
+      child: Column(
+        children: [
+          SizedBox(
+            height: compact ? 76 : 137,
+            width: double.infinity,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned.fill(child: CustomPaint(painter: _MapPainter())),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: ReflexColors.orange,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x663B1A04),
+                        blurRadius: 16,
+                        spreadRadius: 3,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_rounded,
+                    color: Color(0xFF17120E),
+                    size: 20,
+                  ),
+                ),
+                Positioned(
+                  bottom: 11,
+                  left: 10,
+                  child: TagPill(
+                    compact ? 'PISO 3 · REFLEXCAM LAB' : 'ESTUDIO REFLEXCAM',
+                  ),
+                ),
+                if (!compact)
+                  const Positioned(
+                    top: 10,
+                    right: 12,
+                    child: TagPill('GPS: 4.6781° N, 74.0534° W'),
+                  ),
+              ],
+            ),
+          ),
+          if (!compact)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+              color: ReflexColors.surface,
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.location_on_rounded,
+                    color: ReflexColors.orange,
+                    size: 17,
+                  ),
+                  SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      'Bogotá, Parque de la 93 (Zona Norte)',
+                      style: TextStyle(
+                        color: ReflexColors.muted,
+                        fontSize: 10,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    'VER EN GOOGLE MAPS ↗',
+                    style: TextStyle(
+                      color: ReflexColors.orange,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MapPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = const Color(0xFF171A1D),
+    );
+    final roadPaint = Paint()
+      ..color = const Color(0xFF292C30)
+      ..strokeWidth = 5
+      ..style = PaintingStyle.stroke;
+    final thinRoadPaint = Paint()
+      ..color = const Color(0xFF202327)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+    for (final y in [0.2, 0.52, 0.82]) {
+      canvas.drawLine(
+        Offset(0, size.height * y),
+        Offset(size.width, size.height * (y - 0.03)),
+        roadPaint,
+      );
+    }
+    for (final x in [0.18, 0.68, 0.9]) {
+      canvas.drawLine(
+        Offset(size.width * x, 0),
+        Offset(size.width * (x + 0.08), size.height),
+        thinRoadPaint,
+      );
+    }
+    final routePaint = Paint()
+      ..color = ReflexColors.orange.withValues(alpha: 0.7)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(
+      Offset(size.width * 0.63, 0),
+      Offset(size.width * 0.55, size.height),
+      routePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _MapPainter oldDelegate) => false;
+}
+
 class _ServiceOption extends StatelessWidget {
   const _ServiceOption({
     required this.service,
@@ -850,105 +1396,129 @@ class _ServiceOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SurfaceCard(
-      padding: const EdgeInsets.all(13),
-      borderColor: selected ? ReflexColors.orange : ReflexColors.line,
+    return Material(
+      color: ReflexColors.surface,
+      borderRadius: BorderRadius.circular(38),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: ReflexColors.surfaceRaised,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: ReflexColors.line),
-              ),
-              child: Icon(
-                service.icon,
-                color: ReflexColors.orangeLight,
-                size: 19,
-              ),
+        borderRadius: BorderRadius.circular(38),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(15, 15, 14, 14),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF211E1F) : ReflexColors.surface,
+            borderRadius: BorderRadius.circular(38),
+            border: Border.all(
+              color: selected ? ReflexColors.orange : ReflexColors.line,
+              width: selected ? 1.5 : 0.9,
             ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: ReflexColors.orange.withValues(alpha: 0.12),
+                      blurRadius: 16,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      TagPill(service.tag),
-                      const SizedBox(width: 5),
-                      Flexible(
-                        child: Text(
-                          service.category.toUpperCase(),
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: ReflexColors.muted,
-                            fontSize: 8,
-                            letterSpacing: 0.55,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    service.title,
-                    style: const TextStyle(
-                      color: ReflexColors.text,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
+                  Container(
+                    width: 38,
+                    height: 38,
+                    margin: const EdgeInsets.only(top: 5),
+                    decoration: BoxDecoration(
+                      color: ReflexColors.background,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: ReflexColors.line),
+                    ),
+                    child: Icon(
+                      service.icon,
+                      color: selected ? ReflexColors.orange : ReflexColors.text,
+                      size: 18,
                     ),
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    service.description,
-                    style: const TextStyle(
-                      color: ReflexColors.muted,
-                      fontSize: 10,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 9),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.auto_awesome_outlined,
-                        color: ReflexColors.orangeLight,
-                        size: 13,
-                      ),
-                      const SizedBox(width: 5),
-                      Expanded(
-                        child: Text(
-                          service.deliverable.toUpperCase(),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 5,
+                          children: [
+                            TagPill(service.tag),
+                            if (service == _BookingScreenState._services.first)
+                              const TagPill('TOP CHOICE'),
+                          ],
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          service.title,
                           style: const TextStyle(
-                            color: ReflexColors.muted,
-                            fontSize: 8,
-                            letterSpacing: 0.55,
-                            fontWeight: FontWeight.w700,
+                            color: ReflexColors.text,
+                            fontSize: 14,
+                            height: 1.3,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                      ),
-                      PriceLabel(price: '\$${_formatPrice(service.price)}'),
-                    ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Icon(
+                    selected
+                        ? Icons.check_circle
+                        : Icons.radio_button_unchecked_rounded,
+                    color: selected ? ReflexColors.orange : ReflexColors.line,
+                    size: 20,
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 5),
-            Icon(
-              selected
-                  ? Icons.check_circle
-                  : Icons.radio_button_unchecked_rounded,
-              color: selected ? ReflexColors.orange : ReflexColors.line,
-              size: 19,
-            ),
-          ],
+              const SizedBox(height: 11),
+              Text(
+                service.description,
+                style: const TextStyle(
+                  color: ReflexColors.muted,
+                  fontSize: 11,
+                  height: 1.55,
+                ),
+              ),
+              const Divider(color: ReflexColors.line, height: 20),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.workspace_premium_outlined,
+                    color: ReflexColors.orangeLight,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      service.deliverable.toUpperCase(),
+                      style: const TextStyle(
+                        color: ReflexColors.muted,
+                        fontSize: 8,
+                        letterSpacing: 0.7,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    'Desde \$${_formatPrice(service.price)}',
+                    style: TextStyle(
+                      color: selected ? ReflexColors.orange : ReflexColors.text,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1021,60 +1591,80 @@ class _ProgressHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var index = 0; index < _labels.length; index++) ...[
-          Column(
-            children: [
-              Container(
-                width: 24,
-                height: 24,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: index <= currentStep
-                      ? ReflexColors.orange
-                      : ReflexColors.surfaceRaised,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: index <= currentStep
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: ReflexColors.surface,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: ReflexColors.line),
+      ),
+      child: Row(
+        children: [
+          for (var index = 0; index < _labels.length; index++) ...[
+            Column(
+              children: [
+                Container(
+                  width: currentStep == index ? 36 : 31,
+                  height: currentStep == index ? 36 : 31,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: currentStep == index
                         ? ReflexColors.orange
-                        : ReflexColors.line,
+                        : Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: index <= currentStep
+                          ? ReflexColors.orange
+                          : ReflexColors.line,
+                      width: currentStep == index ? 2 : 1,
+                    ),
+                    boxShadow: currentStep == index
+                        ? [
+                            BoxShadow(
+                              color: ReflexColors.orange.withValues(alpha: 0.3),
+                              blurRadius: 12,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Text(
+                    index < currentStep ? '✓' : '${index + 1}',
+                    style: TextStyle(
+                      color: currentStep == index
+                          ? const Color(0xFF17120E)
+                          : ReflexColors.orange,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
-                child: Text(
-                  index < currentStep ? '✓' : '${index + 1}',
-                  style: const TextStyle(
-                    color: Color(0xFF17120E),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
+                const SizedBox(height: 5),
+                Text(
+                  _labels[index],
+                  style: TextStyle(
+                    color: index <= currentStep
+                        ? ReflexColors.orangeLight
+                        : ReflexColors.muted.withValues(alpha: 0.55),
+                    fontSize: 9,
+                    letterSpacing: 0.4,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                _labels[index],
-                style: TextStyle(
-                  color: index == currentStep
-                      ? ReflexColors.orangeLight
-                      : ReflexColors.muted,
-                  fontSize: 8,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          if (index < _labels.length - 1)
-            Expanded(
-              child: Container(
-                height: 1,
-                margin: const EdgeInsets.only(left: 5, right: 5, bottom: 17),
-                color: index < currentStep
-                    ? ReflexColors.orange
-                    : ReflexColors.line,
-              ),
+              ],
             ),
+            if (index < _labels.length - 1)
+              Expanded(
+                child: Container(
+                  height: 2,
+                  margin: const EdgeInsets.only(left: 7, right: 7, bottom: 19),
+                  color: index < currentStep
+                      ? ReflexColors.orange
+                      : ReflexColors.line,
+                ),
+              ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
@@ -1084,11 +1674,13 @@ class _SummaryRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.detail,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final String? detail;
 
   @override
   Widget build(BuildContext context) {
@@ -1120,6 +1712,18 @@ class _SummaryRow extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              if (detail != null) ...[
+                const SizedBox(height: 5),
+                Text(
+                  detail!,
+                  style: const TextStyle(
+                    color: ReflexColors.muted,
+                    fontSize: 8,
+                    height: 1.5,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
