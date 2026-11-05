@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reflexcam_studio/reflexcam_app.dart';
 
@@ -13,6 +14,14 @@ void main() {
 
     await tester.pumpWidget(const ReflexCamApp());
 
+    expect(
+      tester
+          .renderObject<RenderParagraph>(find.text('REFLEXCAM STUDIO'))
+          .text
+          .style
+          ?.fontFamily,
+      'Montserrat',
+    );
     expect(tester.takeException(), isNull);
     expect(find.text('REFLEXCAM STUDIO'), findsOneWidget);
 

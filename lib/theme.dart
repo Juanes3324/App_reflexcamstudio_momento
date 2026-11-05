@@ -17,6 +17,7 @@ class ReflexTheme {
   static final dark = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
+    fontFamily: 'Montserrat',
     scaffoldBackgroundColor: ReflexColors.background,
     colorScheme: const ColorScheme.dark(
       primary: ReflexColors.orange,
