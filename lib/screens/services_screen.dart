@@ -4,9 +4,10 @@ import '../theme.dart';
 import '../widgets/reflex_widgets.dart';
 
 class ServicesScreen extends StatefulWidget {
-  const ServicesScreen({required this.onBook, super.key});
+  const ServicesScreen({required this.onBook, required this.onBack, super.key});
 
   final VoidCallback onBook;
+  final VoidCallback onBack;
 
   @override
   State<ServicesScreen> createState() => _ServicesScreenState();
@@ -80,11 +81,109 @@ class _ServicesScreenState extends State<ServicesScreen> {
     return CustomScrollView(
       key: const PageStorageKey('services-screen'),
       slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+            child: Row(
+              children: [
+                _HeaderButton(
+                  icon: Icons.arrow_back_rounded,
+                  label: 'Volver',
+                  onPressed: widget.onBack,
+                ),
+                const SizedBox(width: 14),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(26),
+                  child: Image.asset(
+                    'assets/images/reflexcam_logo.png',
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'REFLEXCAM',
+                        style: TextStyle(
+                          color: ReflexColors.orange,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      Text(
+                        'SERVICIOS',
+                        style: TextStyle(
+                          color: ReflexColors.text,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          height: 1.05,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _HeaderButton(
+                  icon: Icons.notifications_none_rounded,
+                  label: 'Notificaciones',
+                  onPressed: () => ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(
+                      const SnackBar(
+                        content: Text('No tienes notificaciones nuevas.'),
+                      ),
+                    ),
+                ),
+              ],
+            ),
+          ),
+        ),
         const SliverToBoxAdapter(
-          child: ScreenHeader(
-            eyebrow: 'ReflexCam Studio',
-            title: 'Catálogo de servicios',
-            subtitle: 'Producción visual para marcas con algo que contar.',
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(20, 34, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PRODUCCIÓN AUDIOVISUAL',
+                  style: TextStyle(
+                    color: ReflexColors.orange,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.6,
+                  ),
+                ),
+                SizedBox(height: 8),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Catálogo de Servicios',
+                    softWrap: false,
+                    style: TextStyle(
+                      color: ReflexColors.text,
+                      fontSize: 40,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1.2,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Soluciones técnicas y artísticas de alta fidelidad cinematográfica en fotografía fija, cinematografía digital y diseño gráfico.',
+                  style: TextStyle(
+                    color: ReflexColors.muted,
+                    fontSize: 18,
+                    height: 1.65,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         SliverToBoxAdapter(
@@ -119,7 +218,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                     child: Text(
                       'No encontramos servicios para esa búsqueda.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: ReflexColors.muted, fontSize: 12),
+                      style: TextStyle(color: ReflexColors.muted, fontSize: 14),
                     ),
                   ),
                 )
@@ -134,6 +233,32 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 ),
         ),
       ],
+    );
+  }
+}
+
+class _HeaderButton extends StatelessWidget {
+  const _HeaderButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      tooltip: label,
+      style: IconButton.styleFrom(
+        backgroundColor: ReflexColors.surface,
+        foregroundColor: ReflexColors.text,
+        fixedSize: const Size(54, 54),
+      ),
+      icon: Icon(icon, size: 25),
     );
   }
 }
@@ -190,7 +315,7 @@ class _ServiceCard extends StatelessWidget {
                     service.title,
                     style: const TextStyle(
                       color: ReflexColors.text,
-                      fontSize: 15,
+                      fontSize: 18,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -200,7 +325,7 @@ class _ServiceCard extends StatelessWidget {
                   'Desde ${service.price}',
                   style: const TextStyle(
                     color: ReflexColors.orangeLight,
-                    fontSize: 11,
+                    fontSize: 14,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -213,7 +338,7 @@ class _ServiceCard extends StatelessWidget {
               service.description,
               style: const TextStyle(
                 color: ReflexColors.muted,
-                fontSize: 11,
+                fontSize: 14,
                 height: 1.45,
               ),
             ),
@@ -233,7 +358,7 @@ class _ServiceCard extends StatelessWidget {
                     service.turnaround,
                     style: const TextStyle(
                       color: ReflexColors.text,
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.3,
                     ),
@@ -245,7 +370,7 @@ class _ServiceCard extends StatelessWidget {
                     'Ver detalle  ›',
                     style: TextStyle(
                       color: ReflexColors.orangeLight,
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
                   ),

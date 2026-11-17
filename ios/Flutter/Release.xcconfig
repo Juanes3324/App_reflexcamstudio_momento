@@ -1,1 +1,2 @@
+#include? "MapsAPIKey.xcconfig"
 #include "Generated.xcconfig"

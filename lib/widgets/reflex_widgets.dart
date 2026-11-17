@@ -63,7 +63,7 @@ class Eyebrow extends StatelessWidget {
       text.toUpperCase(),
       style: TextStyle(
         color: color,
-        fontSize: 10,
+        fontSize: 12,
         letterSpacing: 1.2,
         fontWeight: FontWeight.w800,
       ),
@@ -127,7 +127,7 @@ class PrimaryButton extends StatelessWidget {
                   label,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.65,
                   ),
@@ -215,7 +215,7 @@ class PhotoCover extends StatelessWidget {
                     SizedBox(height: 6),
                     Text(
                       'Imagen no disponible',
-                      style: TextStyle(color: ReflexColors.muted, fontSize: 10),
+                      style: TextStyle(color: ReflexColors.muted, fontSize: 12),
                     ),
                   ],
                 ),
@@ -243,7 +243,7 @@ class PriceLabel extends StatelessWidget {
             text: 'Desde ',
             style: TextStyle(
               color: ReflexColors.muted,
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -251,7 +251,7 @@ class PriceLabel extends StatelessWidget {
             text: price,
             style: const TextStyle(
               color: ReflexColors.text,
-              fontSize: 15,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -278,7 +278,7 @@ class TagPill extends StatelessWidget {
         text.toUpperCase(),
         style: const TextStyle(
           color: ReflexColors.orangeLight,
-          fontSize: 9,
+          fontSize: 10,
           fontWeight: FontWeight.w900,
           letterSpacing: 0.6,
         ),

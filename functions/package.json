@@ -1,0 +1,24 @@
+{
+  "name": "reflexcamstudio-functions",
+  "private": true,
+  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint .",
+    "test": "npm run build && node --test"
+  },
+  "dependencies": {
+    "cloudinary": "^2.11.0",
+    "firebase-admin": "^14.5.1",
+    "firebase-functions": "^7.4.0"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.57.0",
+    "@typescript-eslint/parser": "^8.57.0",
+    "eslint": "^9.39.0",
+    "typescript": "^5.9.3"
+  }
+}

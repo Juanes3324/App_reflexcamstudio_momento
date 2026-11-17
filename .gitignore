@@ -31,6 +31,15 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/android/build/
+/android/local.properties
+/ios/Flutter/MapsAPIKey.xcconfig
+/functions/node_modules/
+/functions/lib/
+/firebase-debug.log
+/firebase-debug.*.log
+/firestore-debug.log
+/ui-debug.log
 /coverage/
 
 # Symbolication related

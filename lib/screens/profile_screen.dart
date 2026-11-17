@@ -4,9 +4,13 @@ import '../theme.dart';
 import '../widgets/reflex_widgets.dart';
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({required this.onSignOut, super.key});
+  const ProfileScreen({
+    required this.onSignOut,
+    required this.userEmail,
+    super.key,
+  });
 
-  final VoidCallback onSignOut;
+  final Future<void> Function() onSignOut;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +40,7 @@ class ProfileScreen extends StatelessWidget {
                       ),
                       alignment: Alignment.center,
                       child: const Text(
-                        'GO',
+                        'RC',
                         style: TextStyle(
                           color: ReflexColors.orangeLight,
                           fontSize: 18,
@@ -45,66 +49,30 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 13),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Grano de Oro',
+                          const Text(
+                            'Cuenta Reflexcam',
                             style: TextStyle(
                               color: ReflexColors.text,
-                              fontSize: 16,
+                              fontSize: 18,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
                           SizedBox(height: 4),
                           Text(
-                            'hola@granodeoro.co',
+                            userEmail,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: ReflexColors.muted,
-                              fontSize: 11,
+                              fontSize: 13,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    IconButton(
-                      tooltip: 'Editar perfil',
-                      onPressed: () => ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(
-                          const SnackBar(
-                            content: Text('Edición de perfil no disponible.'),
-                          ),
-                        ),
-                      icon: const Icon(
-                        Icons.edit_outlined,
-                        color: ReflexColors.orangeLight,
-                        size: 19,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 22),
-              const Eyebrow('Tu actividad'),
-              const SizedBox(height: 10),
-              const SurfaceCard(
-                padding: EdgeInsets.all(15),
-                child: Column(
-                  children: [
-                    _ActivityRow(
-                      icon: Icons.calendar_month_outlined,
-                      title: 'Próxima sesión',
-                      subtitle: 'Fotografía de Producto · 08 Oct, 10:00',
-                      status: 'PENDIENTE',
-                    ),
-                    Divider(color: ReflexColors.line, height: 24),
-                    _ActivityRow(
-                      icon: Icons.photo_library_outlined,
-                      title: 'Galería privada',
-                      subtitle: '12 fotografías disponibles',
-                      status: 'ACTIVA',
                     ),
                   ],
                 ),
@@ -151,7 +119,7 @@ class ProfileScreen extends StatelessWidget {
                       icon: Icons.logout_rounded,
                       title: 'Cerrar sesión',
                       color: const Color(0xFFFF8C80),
-                      onTap: onSignOut,
+                      onTap: () => _closeSession(context),
                     ),
                   ],
                 ),
@@ -162,7 +130,7 @@ class ProfileScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: ReflexColors.muted,
-                  fontSize: 9,
+                  fontSize: 10,
                   letterSpacing: 1,
                   fontWeight: FontWeight.w700,
                 ),
@@ -174,55 +142,25 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  final String userEmail;
+
+  Future<void> _closeSession(BuildContext context) async {
+    try {
+      await onSignOut();
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('No se pudo cerrar la sesión: $error')),
+        );
+    }
+  }
+
   void _notify(BuildContext context, String label) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text('$label próximamente.')));
-  }
-}
-
-class _ActivityRow extends StatelessWidget {
-  const _ActivityRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.status,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String status;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: ReflexColors.orange, size: 19),
-        const SizedBox(width: 11),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: ReflexColors.text,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(color: ReflexColors.muted, fontSize: 10),
-              ),
-            ],
-          ),
-        ),
-        TagPill(status),
-      ],
-    );
   }
 }
 
@@ -249,7 +187,7 @@ class _ProfileItem extends StatelessWidget {
         style: TextStyle(
           color: color,
           fontWeight: FontWeight.w600,
-          fontSize: 12,
+          fontSize: 14,
         ),
       ),
       trailing: const Icon(

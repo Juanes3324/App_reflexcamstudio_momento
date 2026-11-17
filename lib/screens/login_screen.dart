@@ -1,12 +1,14 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
 import '../theme.dart';
 import '../widgets/reflex_widgets.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({required this.onLogin, super.key});
+  const LoginScreen({required this.authService, super.key});
 
-  final VoidCallback onLogin;
+  final AuthService authService;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -17,7 +19,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _hidePassword = true;
-  bool _useSessionCode = false;
+  bool _createAccount = false;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -26,11 +29,64 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _submit() {
-    if (_formKey.currentState?.validate() ?? false) {
-      FocusScope.of(context).unfocus();
-      widget.onLogin();
+  Future<void> _submit() async {
+    if (_isSubmitting || !(_formKey.currentState?.validate() ?? false)) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _isSubmitting = true);
+    try {
+      if (_createAccount) {
+        await widget.authService.createAccount(
+          _emailController.text.trim(),
+          _passwordController.text,
+        );
+      } else {
+        await widget.authService.signIn(
+          _emailController.text.trim(),
+          _passwordController.text,
+        );
+      }
+    } catch (error) {
+      if (mounted) _showMessage(_authErrorMessage(error));
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  Future<void> _sendPasswordReset() async {
+    final email = _emailController.text.trim();
+    if (!email.contains('@') || !email.contains('.')) {
+      _showMessage(
+        'Ingresa tu correo para enviarte el enlace de recuperación.',
+      );
+      return;
+    }
+    try {
+      await widget.authService.sendPasswordResetEmail(email);
+      if (mounted) _showMessage('Revisa tu correo para restablecer la clave.');
+    } catch (error) {
+      if (mounted) _showMessage(_authErrorMessage(error));
+    }
+  }
+
+  String _authErrorMessage(Object error) {
+    if (error is! FirebaseAuthException) {
+      return 'No se pudo completar la autenticación. Inténtalo de nuevo.';
+    }
+    return switch (error.code) {
+      'invalid-email' => 'El correo electrónico no es válido.',
+      'email-already-in-use' => 'Ya existe una cuenta con ese correo.',
+      'weak-password' => 'La contraseña debe tener al menos 6 caracteres.',
+      'user-not-found' ||
+      'wrong-password' ||
+      'invalid-credential' => 'Correo o contraseña incorrectos.',
+      'too-many-requests' =>
+        'Demasiados intentos. Espera un momento y vuelve a intentarlo.',
+      'network-request-failed' =>
+        'No hay conexión. Revisa internet e inténtalo de nuevo.',
+      'operation-not-allowed' =>
+        'El acceso por correo y contraseña no está habilitado en Firebase.',
+      _ => 'No se pudo autenticar la cuenta. Inténtalo de nuevo.',
+    };
   }
 
   @override
@@ -64,19 +120,13 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               const SizedBox(height: 27),
                               Container(
-                                width: 78,
+                                width: 100,
                                 height: 78,
                                 margin: const EdgeInsets.only(bottom: 10),
-                                decoration: BoxDecoration(
-                                  color: ReflexColors.surface,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: ReflexColors.line),
-                                ),
-                                child: const Center(
-                                  child: Text(
-                                    '🦅',
-                                    style: TextStyle(fontSize: 41),
-                                  ),
+                                alignment: Alignment.center,
+                                child: Image.asset(
+                                  'assets/images/reflexcam_logo.png',
+                                  fit: BoxFit.contain,
                                 ),
                               ),
                               const Text(
@@ -84,15 +134,17 @@ class _LoginScreenState extends State<LoginScreen> {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: ReflexColors.text,
-                                  fontSize: 25,
+                                  fontSize: 28,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 0.6,
                                 ),
                               ),
                               const SizedBox(height: 5),
-                              const Eyebrow(
-                                'PORTAL CLIENTES',
-                                color: ReflexColors.orangeLight,
+                              const Center(
+                                child: Eyebrow(
+                                  'PORTAL CLIENTES',
+                                  color: ReflexColors.orangeLight,
+                                ),
                               ),
                               const SizedBox(height: 5),
                               const Text(
@@ -100,56 +152,38 @@ class _LoginScreenState extends State<LoginScreen> {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: ReflexColors.muted,
-                                  fontSize: 11,
+                                  fontSize: 14,
                                   height: 1.45,
                                 ),
                               ),
                               const SizedBox(height: 22),
                               _LoginModeSwitch(
-                                sessionCode: _useSessionCode,
+                                createAccount: _createAccount,
                                 onChanged: (value) =>
-                                    setState(() => _useSessionCode = value),
+                                    setState(() => _createAccount = value),
                               ),
                               const SizedBox(height: 19),
-                              _FieldLabel(
-                                _useSessionCode
-                                    ? 'CÓDIGO DE SESIÓN'
-                                    : 'CORREO O ID DE CLIENTE',
-                              ),
+                              const _FieldLabel('CORREO ELECTRÓNICO'),
                               const SizedBox(height: 7),
                               TextFormField(
                                 key: const ValueKey('login-email'),
                                 controller: _emailController,
-                                keyboardType: _useSessionCode
-                                    ? TextInputType.text
-                                    : TextInputType.emailAddress,
+                                keyboardType: TextInputType.emailAddress,
                                 textInputAction: TextInputAction.next,
-                                autofillHints: _useSessionCode
-                                    ? null
-                                    : const [AutofillHints.email],
-                                style: const TextStyle(fontSize: 13),
+                                autofillHints: const [AutofillHints.email],
+                                style: const TextStyle(fontSize: 14),
                                 decoration: InputDecoration(
-                                  hintText: _useSessionCode
-                                      ? 'RFX-9821'
-                                      : 'cliente@dominio.com o RFX-9821',
-                                  prefixIcon: Icon(
-                                    _useSessionCode
-                                        ? Icons.key_outlined
-                                        : Icons.badge_outlined,
+                                  hintText: 'cliente@dominio.com',
+                                  prefixIcon: const Icon(
+                                    Icons.email_outlined,
                                     size: 19,
                                   ),
                                 ),
                                 validator: (value) {
                                   final text = value?.trim() ?? '';
-                                  if (text.isEmpty) {
-                                    return _useSessionCode
-                                        ? 'Ingresa tu código de sesión'
-                                        : 'Ingresa tu correo o ID de cliente';
-                                  }
-                                  if (!_useSessionCode &&
-                                      text.contains('@') &&
-                                      (!text.contains('.') ||
-                                          text.startsWith('@'))) {
+                                  if (!text.contains('@') ||
+                                      !text.contains('.') ||
+                                      text.startsWith('@')) {
                                     return 'Ingresa un correo válido';
                                   }
                                   return null;
@@ -164,9 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                   ),
                                   TextButton(
-                                    onPressed: () => _showMessage(
-                                      'Contacta al Concierge Reflexcam para recuperar tu clave.',
-                                    ),
+                                    onPressed: _sendPasswordReset,
                                     style: TextButton.styleFrom(
                                       padding: EdgeInsets.zero,
                                       visualDensity: VisualDensity.compact,
@@ -175,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       '¿Olvidaste tu clave?',
                                       style: TextStyle(
                                         color: ReflexColors.orangeLight,
-                                        fontSize: 10,
+                                        fontSize: 12,
                                       ),
                                     ),
                                   ),
@@ -190,7 +222,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 onFieldSubmitted: (_) => _submit(),
                                 autofillHints: const [AutofillHints.password],
                                 style: const TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 14,
                                   letterSpacing: 1.1,
                                 ),
                                 decoration: InputDecoration(
@@ -218,43 +250,21 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               const SizedBox(height: 15),
                               PrimaryButton(
-                                label: 'INGRESAR AL ESTUDIO',
-                                onPressed: _submit,
+                                label: _isSubmitting
+                                    ? 'CONECTANDO...'
+                                    : _createAccount
+                                    ? 'CREAR CUENTA'
+                                    : 'INGRESAR AL ESTUDIO',
+                                onPressed: _isSubmitting ? null : _submit,
                                 height: 53,
-                              ),
-                              const SizedBox(height: 19),
-                              const _OrDivider(label: 'O ACCEDER CON'),
-                              const SizedBox(height: 14),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _SocialButton(
-                                      label: 'Google',
-                                      icon: Icons.g_mobiledata_rounded,
-                                      onPressed: () => _showMessage(
-                                        'El acceso con Google aún no está configurado.',
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: _SocialButton(
-                                      label: 'Apple',
-                                      icon: Icons.apple,
-                                      onPressed: () => _showMessage(
-                                        'El acceso con Apple aún no está configurado.',
-                                      ),
-                                    ),
-                                  ),
-                                ],
                               ),
                               const SizedBox(height: 18),
                               const Text(
-                                '¿Problemas con tus credenciales o clave de entrega?',
+                                'Tu cuenta protege el acceso a tus reservas y galerías.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: ReflexColors.muted,
-                                  fontSize: 11,
+                                  fontSize: 13,
                                 ),
                               ),
                               TextButton.icon(
@@ -381,9 +391,12 @@ class _LoginTopBar extends StatelessWidget {
 }
 
 class _LoginModeSwitch extends StatelessWidget {
-  const _LoginModeSwitch({required this.sessionCode, required this.onChanged});
+  const _LoginModeSwitch({
+    required this.createAccount,
+    required this.onChanged,
+  });
 
-  final bool sessionCode;
+  final bool createAccount;
   final ValueChanged<bool> onChanged;
 
   @override
@@ -392,17 +405,17 @@ class _LoginModeSwitch extends StatelessWidget {
       children: [
         Expanded(
           child: _ModeButton(
-            selected: !sessionCode,
+            selected: !createAccount,
             icon: Icons.person_outline_rounded,
-            label: 'Cuenta Cliente',
+            label: 'Ingresar',
             onTap: () => onChanged(false),
           ),
         ),
         Expanded(
           child: _ModeButton(
-            selected: sessionCode,
-            icon: Icons.key_outlined,
-            label: 'Código de Sesión',
+            selected: createAccount,
+            icon: Icons.person_add_alt_outlined,
+            label: 'Crear cuenta',
             onTap: () => onChanged(true),
           ),
         ),
@@ -479,60 +492,6 @@ class _FieldLabel extends StatelessWidget {
         fontSize: 9,
         letterSpacing: 0.5,
         fontWeight: FontWeight.w800,
-      ),
-    );
-  }
-}
-
-class _OrDivider extends StatelessWidget {
-  const _OrDivider({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Expanded(child: Divider(color: ReflexColors.line)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: ReflexColors.muted,
-              fontSize: 8,
-              letterSpacing: 1,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        const Expanded(child: Divider(color: ReflexColors.line)),
-      ],
-    );
-  }
-}
-
-class _SocialButton extends StatelessWidget {
-  const _SocialButton({
-    required this.label,
-    required this.onPressed,
-    required this.icon,
-  });
-
-  final String label;
-  final VoidCallback onPressed;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 19),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: ReflexColors.text,
-        side: const BorderSide(color: ReflexColors.line),
-        minimumSize: const Size.fromHeight(44),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       ),
     );
   }

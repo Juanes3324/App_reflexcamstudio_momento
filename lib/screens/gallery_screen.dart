@@ -1,59 +1,270 @@
 import 'package:flutter/material.dart';
 
+import '../services/gallery_repository.dart';
 import '../theme.dart';
 import '../widgets/reflex_widgets.dart';
 
 class GalleryScreen extends StatefulWidget {
-  const GalleryScreen({super.key});
+  const GalleryScreen({required this.repository, super.key});
+
+  final GalleryRepository repository;
 
   @override
   State<GalleryScreen> createState() => _GalleryScreenState();
 }
 
 class _GalleryScreenState extends State<GalleryScreen> {
-  static const _photos = [
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&h=760&q=85',
-    'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=600&h=760&q=85',
-    'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=600&h=760&q=85',
-    'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=600&h=760&q=85',
-    'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=600&h=760&q=85',
-    'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?auto=format&fit=crop&w=600&h=760&q=85',
-    'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=600&h=760&q=85',
-    'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=600&h=760&q=85',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&h=760&q=85',
-    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&h=760&q=85',
-    'https://images.unsplash.com/photo-1504593811423-6dd665756598?auto=format&fit=crop&w=600&h=760&q=85',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&h=760&q=85',
-  ];
+  static const _disciplines = ['Todos', 'Fotografía', 'Video'];
 
-  late final Set<int> _selected = Set<int>.of(
-    List<int>.generate(_photos.length, (index) => index),
-  );
+  late Future<List<GallerySession>> _sessionsFuture;
+  String _selectedDiscipline = 'Todos';
+  bool _showPortfolio = false;
+  GallerySession? _activeSession;
+
+  @override
+  void initState() {
+    super.initState();
+    _sessionsFuture = widget.repository.listMyGalleries();
+  }
+
+  void _reload() {
+    setState(() {
+      _activeSession = null;
+      _sessionsFuture = widget.repository.listMyGalleries();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final activeSession = _activeSession;
+    if (activeSession != null) return _buildPhotoGallery(activeSession);
+
+    return FutureBuilder<List<GallerySession>>(
+      future: _sessionsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _buildError(snapshot.error!);
+        }
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(
+            child: CircularProgressIndicator(color: ReflexColors.orange),
+          );
+        }
+
+        final allSessions = snapshot.data ?? const <GallerySession>[];
+        final matchingSessions = allSessions.where((session) {
+          return _selectedDiscipline == 'Todos' ||
+              session.category == _selectedDiscipline;
+        }).toList();
+        final sessions = !_showPortfolio && _selectedDiscipline == 'Todos'
+            ? matchingSessions.take(2).toList()
+            : matchingSessions;
+
+        return _buildSessions(allSessions, sessions);
+      },
+    );
+  }
+
+  Widget _buildError(Object error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_outlined,
+              color: ReflexColors.orange,
+              size: 35,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'No se pudieron cargar tus galerías.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: ReflexColors.text,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              error.toString(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: ReflexColors.muted, fontSize: 11),
+            ),
+            const SizedBox(height: 14),
+            TextButton.icon(
+              onPressed: _reload,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Intentar de nuevo'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSessions(
+    List<GallerySession> allSessions,
+    List<GallerySession> sessions,
+  ) {
     return CustomScrollView(
       key: const PageStorageKey('gallery-screen'),
       slivers: [
         SliverToBoxAdapter(
-          child: ScreenHeader(
-            eyebrow: 'Tus recuerdos, en privado',
-            title: 'Galería privada',
-            subtitle: 'Selecciona las fotografías que quieres recibir.',
-            trailing: IconButton(
-              tooltip: 'Más opciones',
-              onPressed: () => ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  const SnackBar(content: Text('Tu galería es privada.')),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Eyebrow(
+                    'Entregas privadas',
+                    color: ReflexColors.muted,
+                  ),
                 ),
-              icon: const Icon(Icons.more_horiz_rounded),
+                const Spacer(),
+                Text(
+                  '${sessions.length.toString().padLeft(2, '0')} DISPONIBLES',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: ReflexColors.muted,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: 44,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              scrollDirection: Axis.horizontal,
+              itemCount: _disciplines.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 7),
+              itemBuilder: (context, index) {
+                final discipline = _disciplines[index];
+                final selected = _selectedDiscipline == discipline;
+                return ChoiceChip(
+                  key: ValueKey('discipline-$discipline'),
+                  label: Text(discipline),
+                  selected: selected,
+                  showCheckmark: false,
+                  onSelected: (_) =>
+                      setState(() => _selectedDiscipline = discipline),
+                  backgroundColor: ReflexColors.surface,
+                  selectedColor: ReflexColors.orange,
+                  side: BorderSide(
+                    color: selected ? ReflexColors.orange : ReflexColors.line,
+                  ),
+                  labelStyle: TextStyle(
+                    color: selected
+                        ? const Color(0xFF17120E)
+                        : ReflexColors.muted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 7),
+                  shape: const StadiumBorder(),
+                );
+              },
             ),
           ),
         ),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 15),
+            padding: const EdgeInsets.fromLTRB(14, 13, 14, 10),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Tus proyectos',
+                    style: TextStyle(
+                      color: ReflexColors.text,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  key: const ValueKey('gallery-refresh'),
+                  tooltip: 'Actualizar galerías',
+                  onPressed: _reload,
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+                IconButton(
+                  key: const ValueKey('gallery-portfolio-toggle'),
+                  tooltip: _showPortfolio ? 'Mostrar recientes' : 'Ver todas',
+                  onPressed: () =>
+                      setState(() => _showPortfolio = !_showPortfolio),
+                  icon: Icon(
+                    _showPortfolio
+                        ? Icons.history_rounded
+                        : Icons.arrow_forward_rounded,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (sessions.isEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 38, horizontal: 24),
+              child: Text(
+                allSessions.isEmpty
+                    ? 'Tus entregas aparecerán aquí cuando Reflexcam las publique.'
+                    : 'No hay entregas en esta disciplina.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: ReflexColors.muted,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 22),
+            sliver: SliverList.separated(
+              itemCount: sessions.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) => _SessionCard(
+                session: sessions[index],
+                onTap: () => setState(() => _activeSession = sessions[index]),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPhotoGallery(GallerySession session) {
+    return CustomScrollView(
+      key: const PageStorageKey('gallery-photo-selection'),
+      slivers: [
+        SliverToBoxAdapter(
+          child: ScreenHeader(
+            eyebrow: 'Entrega privada · ${session.category}',
+            title: session.title,
+            subtitle: session.dateLabel,
+            trailing: IconButton(
+              key: const ValueKey('gallery-back-to-sessions'),
+              tooltip: 'Volver a sesiones',
+              onPressed: () => setState(() => _activeSession = null),
+              icon: const Icon(Icons.arrow_back_rounded),
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 15),
             child: SurfaceCard(
               padding: const EdgeInsets.all(14),
               child: const Row(
@@ -69,7 +280,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       'Esta galería solo es visible para ti y tu equipo creativo.',
                       style: TextStyle(
                         color: ReflexColors.muted,
-                        fontSize: 11,
+                        fontSize: 13,
                         height: 1.4,
                       ),
                     ),
@@ -79,161 +290,236 @@ class _GalleryScreenState extends State<GalleryScreen> {
             ),
           ),
         ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          sliver: SliverGrid.builder(
-            itemCount: _photos.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 0.79,
+        if (session.photos.isEmpty)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'La entrega todavía no tiene fotografías publicadas.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: ReflexColors.muted, fontSize: 13),
+              ),
             ),
-            itemBuilder: (context, index) {
-              final selected = _selected.contains(index);
-              return Semantics(
-                button: true,
-                label:
-                    'Fotografía ${index + 1}, ${selected ? 'seleccionada' : 'no seleccionada'}',
-                child: GestureDetector(
-                  onTap: () => setState(() {
-                    if (!_selected.add(index)) _selected.remove(index);
-                  }),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.network(
-                          _photos[index],
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(
-                                color: ReflexColors.surfaceRaised,
-                                child: const Icon(
-                                  Icons.image_not_supported_outlined,
-                                  color: ReflexColors.muted,
-                                ),
-                              ),
-                        ),
-                        if (selected)
-                          Container(
-                            decoration: BoxDecoration(
-                              color: ReflexColors.orange.withValues(
-                                alpha: 0.13,
-                              ),
-                              border: Border.all(
-                                color: ReflexColors.orange,
-                                width: 1.5,
-                              ),
-                            ),
-                          ),
-                        Positioned(
-                          top: 7,
-                          right: 7,
-                          child: Icon(
-                            selected
-                                ? Icons.check_circle
-                                : Icons.radio_button_unchecked_rounded,
-                            color: selected
-                                ? ReflexColors.orange
-                                : Colors.white.withValues(alpha: 0.75),
-                            size: 19,
-                          ),
-                        ),
-                        Positioned(
-                          left: 7,
-                          bottom: 7,
-                          child: Text(
-                            (index + 1).toString().padLeft(2, '0'),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                              shadows: [Shadow(blurRadius: 4)],
-                            ),
-                          ),
-                        ),
-                      ],
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            sliver: SliverGrid.builder(
+              itemCount: session.photos.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 0.79,
+              ),
+              itemBuilder: (context, index) => ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(
+                  session.photos[index].toString(),
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: ReflexColors.surfaceRaised,
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.image_not_supported_outlined,
+                      color: ReflexColors.muted,
                     ),
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           ),
-        ),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            child: SurfaceCard(
-              padding: const EdgeInsets.all(13),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.photo_library_outlined,
-                    color: ReflexColors.orange,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Text(
-                      '${_selected.length} de ${_photos.length} fotografías seleccionadas',
-                      style: const TextStyle(
-                        color: ReflexColors.text,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => setState(() {
-                      if (_selected.length == _photos.length) {
-                        _selected.clear();
-                      } else {
-                        _selected
-                          ..clear()
-                          ..addAll(
-                            List<int>.generate(
-                              _photos.length,
-                              (index) => index,
-                            ),
-                          );
-                      }
-                    }),
-                    child: Text(
-                      _selected.length == _photos.length ? 'Limpiar' : 'Todas',
-                      style: const TextStyle(
-                        color: ReflexColors.orangeLight,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ),
-                ],
+            padding: const EdgeInsets.fromLTRB(14, 16, 14, 24),
+            child: Text(
+              '${session.photos.length} fotografías',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: ReflexColors.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
         ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 22),
-            child: PrimaryButton(
-              label: 'ENVIAR SELECCIÓN (${_selected.length} FOTOS)',
-              onPressed: _selected.isEmpty
-                  ? null
-                  : () => ScaffoldMessenger.of(context)
-                      ..hideCurrentSnackBar()
-                      ..showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Selección de ${_selected.length} fotos lista para enviar.',
+      ],
+    );
+  }
+}
+
+class _SessionCard extends StatelessWidget {
+  const _SessionCard({required this.session, required this.onTap});
+
+  final GallerySession session;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cover = session.photos.isEmpty ? null : session.photos.first;
+    return Material(
+      color: ReflexColors.surface,
+      child: InkWell(
+        key: ValueKey('session-${session.title}'),
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: ReflexColors.line, width: 0.8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 210,
+                width: double.infinity,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (cover == null)
+                      const ColoredBox(
+                        color: ReflexColors.surfaceRaised,
+                        child: Icon(
+                          Icons.photo_library_outlined,
+                          color: ReflexColors.muted,
+                          size: 32,
+                        ),
+                      )
+                    else
+                      Image.network(
+                        cover.toString(),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const ColoredBox(
+                              color: ReflexColors.surfaceRaised,
+                              child: Icon(
+                                Icons.image_not_supported_outlined,
+                                color: ReflexColors.muted,
+                                size: 28,
+                              ),
+                            ),
+                      ),
+                    const Positioned(
+                      top: 12,
+                      left: 12,
+                      child: _SessionImageLabel('ENTREGA PRIVADA'),
+                    ),
+                    Positioned(
+                      bottom: 10,
+                      right: 10,
+                      child: _SessionImageLabel(
+                        '${session.photos.length} FOTOS',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 13, 16, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            session.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: ReflexColors.text,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        Text(
+                          session.dateLabel,
+                          style: const TextStyle(
+                            color: ReflexColors.muted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      '${session.category} · ${session.photos.length} fotografías disponibles.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: ReflexColors.muted,
+                        fontSize: 13,
+                        height: 1.45,
                       ),
-              icon: Icons.send_rounded,
-            ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.photo_library_outlined,
+                          color: ReflexColors.muted,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${session.photos.length} Archivos',
+                          style: const TextStyle(
+                            color: ReflexColors.muted,
+                            fontSize: 11,
+                          ),
+                        ),
+                        const Spacer(),
+                        const Icon(
+                          Icons.lock_outline_rounded,
+                          color: ReflexColors.muted,
+                          size: 15,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          session.status,
+                          style: const TextStyle(
+                            color: ReflexColors.muted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _SessionImageLabel extends StatelessWidget {
+  const _SessionImageLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xE8202022),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: ReflexColors.text,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "114587436078",
+    "project_id": "reflexcamstudioapp",
+    "storage_bucket": "reflexcamstudioapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:114587436078:android:86e50aebcaae52f85e4bbf",
+        "android_client_info": {
+          "package_name": "com.reflexcamstudio.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBwu-mGXhuzt1y93v5xgYCfb-hXO3BoGmw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

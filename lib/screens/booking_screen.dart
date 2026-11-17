@@ -1,12 +1,21 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../services/booking_repository.dart';
 import '../theme.dart';
 import '../widgets/reflex_widgets.dart';
 
 class BookingScreen extends StatefulWidget {
-  const BookingScreen({required this.onComplete, super.key});
+  const BookingScreen({
+    required this.onComplete,
+    required this.repository,
+    super.key,
+  });
 
   final VoidCallback onComplete;
+  final BookingRepository repository;
 
   @override
   State<BookingScreen> createState() => _BookingScreenState();
@@ -14,13 +23,15 @@ class BookingScreen extends StatefulWidget {
 
 class _BookingScreenState extends State<BookingScreen> {
   int _step = 0;
-  DateTime _displayedMonth = DateTime(2026, 10);
-  int _selectedDay = 8;
+  late DateTime _displayedMonth;
+  late int _selectedDay;
   String _selectedTime = '10:00';
   String _location = 'Estudio Reflexcam';
+  LatLng? _selectedLocation;
   bool _termsAccepted = false;
-  bool _sent = false;
-  bool _assistantRequired = true;
+  bool _isSubmitting = false;
+  BookingCheckout? _checkout;
+  GoogleMapController? _mapController;
   final Set<String> _selectedServices = {'Fotografía de Producto & Branding'};
   final Set<String> _selectedExtras = {};
   final TextEditingController _addressController = TextEditingController();
@@ -28,6 +39,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   static const _services = [
     _BookingService(
+      id: 'product_branding',
       category: 'Foto estudio',
       title: 'Fotografía de Producto & Branding',
       description: 'Tomas en alta resolución para ecommerce, catálogo y redes con calibración de color, iluminación estroboscópica y tethering en vivo.',
@@ -37,6 +49,7 @@ class _BookingScreenState extends State<BookingScreen> {
       tag: '4H ESTUDIO',
     ),
     _BookingService(
+      id: 'promotional_video',
       category: 'Video 4K / 60P',
       title: 'Video Promocional & Reels',
       description: 'Producción audiovisual y reels verticales 9:16 cinematográficos, etalonaje profesional y optimización para anuncios de alto impacto.',
@@ -46,6 +59,7 @@ class _BookingScreenState extends State<BookingScreen> {
       tag: 'TOP CHOICE',
     ),
     _BookingService(
+      id: 'event_coverage',
       category: 'Multicámara',
       title: 'Cobertura de Evento',
       description: 'Registro documental de congresos, pasarelas y lanzamientos de producto con entrega express para prensa y comunicación digital.',
@@ -55,6 +69,7 @@ class _BookingScreenState extends State<BookingScreen> {
       tag: 'EVENTO',
     ),
     _BookingService(
+      id: 'fashion_lookbook',
       category: 'Director de arte',
       title: 'Lookbook & Moda Editorial',
       description: 'Dirección de arte completa, modelos, estilismo y scouting de locación enfocado en colecciones de temporada y campañas editoriales.',
@@ -66,9 +81,9 @@ class _BookingScreenState extends State<BookingScreen> {
   ];
 
   static const _extras = [
-    ('Asistente de estilismo', 80000),
-    ('Iluminación extra', 50000),
-    ('Entrega express', 70000),
+    (id: 'styling_assistant', title: 'Asistente de estilismo', price: 80000),
+    (id: 'extra_lighting', title: 'Iluminación extra', price: 50000),
+    (id: 'express_delivery', title: 'Entrega express', price: 70000),
   ];
 
   static const _monthNames = [
@@ -112,13 +127,21 @@ class _BookingScreenState extends State<BookingScreen> {
           ).weekday -
           1];
 
+  @override
+  void initState() {
+    super.initState();
+    final bookingDate = DateTime.now().add(const Duration(days: 1));
+    _displayedMonth = DateTime(bookingDate.year, bookingDate.month);
+    _selectedDay = bookingDate.day;
+  }
+
   int get _servicesTotal => _services
       .where((service) => _selectedServices.contains(service.title))
       .fold(0, (total, service) => total + service.price);
 
   int get _extrasTotal => _extras
-      .where((extra) => _selectedExtras.contains(extra.$1))
-      .fold(0, (total, extra) => total + extra.$2);
+      .where((extra) => _selectedExtras.contains(extra.title))
+      .fold(0, (total, extra) => total + extra.price);
 
   int get _total => _servicesTotal + _extrasTotal;
 
@@ -131,8 +154,13 @@ class _BookingScreenState extends State<BookingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_sent) {
-      return _ConfirmationScreen(onComplete: widget.onComplete);
+    final checkout = _checkout;
+    if (checkout != null) {
+      return _ConfirmationScreen(
+        booking: checkout,
+        repository: widget.repository,
+        onComplete: widget.onComplete,
+      );
     }
 
     return Column(
@@ -165,7 +193,7 @@ class _BookingScreenState extends State<BookingScreen> {
                           'Selecciona tu servicio',
                           style: TextStyle(
                             color: ReflexColors.text,
-                            fontSize: 23,
+                            fontSize: 28,
                             height: 1.15,
                             fontWeight: FontWeight.w800,
                           ),
@@ -175,7 +203,7 @@ class _BookingScreenState extends State<BookingScreen> {
                           'Elige el tipo de producción que requiere tu marca o proyecto comercial.',
                           style: TextStyle(
                             color: ReflexColors.muted,
-                            fontSize: 12,
+                            fontSize: 14,
                             height: 1.45,
                           ),
                         ),
@@ -309,13 +337,15 @@ class _BookingScreenState extends State<BookingScreen> {
                       '$_monthName ${_displayedMonth.year}',
                       style: const TextStyle(
                         color: ReflexColors.text,
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
                   IconButton(
-                    onPressed: () => _changeMonth(-1),
+                    onPressed: _isCurrentOrPastMonth
+                        ? null
+                        : () => _changeMonth(-1),
                     icon: const Icon(Icons.chevron_left_rounded, size: 20),
                     visualDensity: VisualDensity.compact,
                   ),
@@ -356,10 +386,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 itemBuilder: (context, index) {
                   if (index < _leadingDays) return const SizedBox.shrink();
                   final day = index - _leadingDays + 1;
-                  final isPast =
-                      _displayedMonth.year == 2026 &&
-                      _displayedMonth.month == 10 &&
-                      day < 5;
+                  final isPast = _isPastDate(day);
                   final selected = day == _selectedDay;
                   return Padding(
                     padding: const EdgeInsets.all(2),
@@ -442,7 +469,7 @@ class _BookingScreenState extends State<BookingScreen> {
             ),
             const SizedBox(width: 8),
             const Text(
-              'TACHADO = OCUPADO',
+              'SUJETO A CONFIRMACIÓN',
               style: TextStyle(
                 color: ReflexColors.muted,
                 fontSize: 8,
@@ -461,21 +488,21 @@ class _BookingScreenState extends State<BookingScreen> {
           crossAxisSpacing: 8,
           childAspectRatio: 2.15,
           children: [
-            for (final slot in [
-              (time: '08:00', busy: true),
-              (time: '09:00', busy: false),
-              (time: '10:00', busy: false),
-              (time: '14:00', busy: true),
-              (time: '15:00', busy: false),
-              (time: '16:00', busy: false),
+            for (final time in [
+              '08:00',
+              '09:00',
+              '10:00',
+              '14:00',
+              '15:00',
+              '16:00',
             ])
               _TimeSlot(
-                time: slot.time,
-                selected: slot.time == _selectedTime,
-                busy: slot.busy,
-                onTap: slot.busy
+                time: time,
+                selected: time == _selectedTime,
+                disabled: _isPastTime(time),
+                onTap: _isPastTime(time)
                     ? null
-                    : () => setState(() => _selectedTime = slot.time),
+                    : () => setState(() => _selectedTime = time),
               ),
           ],
         ),
@@ -500,16 +527,8 @@ class _BookingScreenState extends State<BookingScreen> {
                     ),
                     children: [
                       const TextSpan(
-                        text: '¿No encuentras un horario conveniente para tu equipo? ',
+                        text: 'La fecha y hora son una solicitud; el estudio confirmará disponibilidad después del pago. ',
                       ),
-                      TextSpan(
-                        text: 'Escríbenos por WhatsApp',
-                        style: const TextStyle(
-                          color: ReflexColors.orange,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const TextSpan(text: ' ↗'),
                     ],
                   ),
                 ),
@@ -527,8 +546,8 @@ class _BookingScreenState extends State<BookingScreen> {
       children: [
         _SelectedSessionCard(
           title:
-              'Fotografía de Producto · $_selectedWeekday $_selectedDay Oct, $_selectedTime AM',
-          stepLabel: 'SESIÓN CONFIRMADA',
+              '${_selectedServices.first} · $_selectedWeekday $_selectedDay $_monthName, $_selectedTime',
+          stepLabel: 'FECHA SOLICITADA',
           trailing: '4H ESTUDIO',
         ),
         const SizedBox(height: 20),
@@ -538,7 +557,7 @@ class _BookingScreenState extends State<BookingScreen> {
               child: Text(
                 'Ubicación de la Sesión',
                 style: Theme.of(context).textTheme.titleLarge
-                    ?.copyWith(fontSize: 23, height: 1.25),
+                    ?.copyWith(fontSize: 28, height: 1.25),
               ),
             ),
             const TagPill('Logística'),
@@ -549,7 +568,7 @@ class _BookingScreenState extends State<BookingScreen> {
           'Elige el espacio ideal para el despliegue del equipo técnico.',
           style: TextStyle(
             color: ReflexColors.muted,
-            fontSize: 12,
+            fontSize: 14,
             height: 1.45,
           ),
         ),
@@ -577,13 +596,16 @@ class _BookingScreenState extends State<BookingScreen> {
           TextField(
             controller: _addressController,
             decoration: const InputDecoration(
-              hintText: 'Dirección de la locación',
+              hintText: 'Dirección o referencia (opcional)',
               prefixIcon: Icon(Icons.location_on_outlined, size: 19),
             ),
           ),
+          const SizedBox(height: 13),
+          _buildLocationMap(),
+        ] else ...[
+          const SizedBox(height: 13),
+          const _StudioMapPreview(),
         ],
-        const SizedBox(height: 13),
-        const _StudioMapPreview(),
         const SizedBox(height: 14),
         SurfaceCard(
           padding: const EdgeInsets.all(15),
@@ -632,39 +654,170 @@ class _BookingScreenState extends State<BookingScreen> {
                 ),
               ),
               const Divider(color: ReflexColors.line, height: 22),
-              Material(
-                color: Colors.transparent,
-                child: CheckboxListTile(
-                  value: _assistantRequired,
-                  onChanged: (value) =>
-                      setState(() => _assistantRequired = value ?? false),
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  activeColor: ReflexColors.orange,
-                  title: const Text(
-                    '¿Requieres asistente de estilismo o iluminación extra?',
-                    style: TextStyle(
-                      color: ReflexColors.text,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+              const Text(
+                'Servicios adicionales',
+                style: TextStyle(
+                  color: ReflexColors.text,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              for (final extra in _extras)
+                Material(
+                  color: Colors.transparent,
+                  child: CheckboxListTile(
+                    key: ValueKey('booking-extra-${extra.id}'),
+                    value: _selectedExtras.contains(extra.title),
+                    onChanged: (value) => setState(() {
+                      if (value ?? false) {
+                        _selectedExtras.add(extra.title);
+                      } else {
+                        _selectedExtras.remove(extra.title);
+                      }
+                    }),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    activeColor: ReflexColors.orange,
+                    title: Text(
+                      extra.title,
+                      style: const TextStyle(
+                        color: ReflexColors.text,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  subtitle: const Text(
-                    'Incluye apoyo técnico de calibración y setup de colorímetro X-Rite.',
-                    style: TextStyle(
-                      color: ReflexColors.muted,
-                      fontSize: 10,
-                      height: 1.4,
+                    subtitle: Text(
+                      '\$${_formatPrice(extra.price)} COP',
+                      style: const TextStyle(
+                        color: ReflexColors.muted,
+                        fontSize: 10,
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
       ],
     );
+  }
+
+  Widget _buildLocationMap() {
+    final selectedLocation = _selectedLocation;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: SizedBox(
+        height: 230,
+        child: Stack(
+          children: [
+            GoogleMap(
+              initialCameraPosition: const CameraPosition(
+                target: LatLng(4.711, -74.0721),
+                zoom: 11,
+              ),
+              mapToolbarEnabled: false,
+              myLocationButtonEnabled: false,
+              myLocationEnabled: false,
+              markers: {
+                if (selectedLocation != null)
+                  Marker(
+                    markerId: const MarkerId('booking-location'),
+                    position: selectedLocation,
+                    infoWindow: const InfoWindow(title: 'Lugar del trabajo'),
+                  ),
+              },
+              onMapCreated: (controller) => _mapController = controller,
+              onTap: (location) => setState(() => _selectedLocation = location),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: FilledButton.icon(
+                key: const ValueKey('booking-current-location'),
+                onPressed: _useCurrentLocation,
+                icon: const Icon(Icons.my_location_rounded, size: 16),
+                label: const Text('Usar mi ubicación'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: ReflexColors.surface,
+                  foregroundColor: ReflexColors.text,
+                  textStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 10,
+              right: 10,
+              bottom: 10,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: ReflexColors.background.withValues(alpha: 0.94),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(9),
+                  child: Text(
+                    selectedLocation == null
+                        ? 'Toca el mapa para marcar el lugar del trabajo.'
+                        : 'Ubicación: ${selectedLocation.latitude.toStringAsFixed(5)}, ${selectedLocation.longitude.toStringAsFixed(5)}',
+                    style: const TextStyle(
+                      color: ReflexColors.text,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _useCurrentLocation() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw StateError('Activa los servicios de ubicación del dispositivo.');
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied) {
+        throw StateError(
+          'Se necesita permiso de ubicación para usar esta opción.',
+        );
+      }
+      if (permission == LocationPermission.deniedForever) {
+        throw StateError(
+          'El permiso está bloqueado. Habilítalo en la configuración de la aplicación.',
+        );
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+      final location = LatLng(position.latitude, position.longitude);
+      setState(() => _selectedLocation = location);
+      await _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: location, zoom: 16),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(error.toString())));
+    }
   }
 
   Widget _buildSummary() {
@@ -678,7 +831,7 @@ class _BookingScreenState extends State<BookingScreen> {
             'Resumen de tu reserva',
             style: TextStyle(
               color: ReflexColors.text,
-              fontSize: 24,
+              fontSize: 28,
               fontWeight: FontWeight.w900,
               height: 1.1,
             ),
@@ -737,11 +890,13 @@ class _BookingScreenState extends State<BookingScreen> {
                 value: _location == 'Estudio Reflexcam'
                     ? 'Estudio Reflexcam'
                     : _addressController.text.isEmpty
-                    ? 'Mi negocio / Locación'
+                    ? 'Punto marcado en el mapa'
                     : _addressController.text,
                 detail: _location == 'Estudio Reflexcam'
                     ? 'Calle 93 # 12-40, Piso 3 · Bogotá, Colombia'
-                    : 'Bogotá, Colombia',
+                    : _selectedLocation == null
+                    ? 'Selecciona la ubicación en el mapa'
+                    : '${_selectedLocation!.latitude.toStringAsFixed(5)}, ${_selectedLocation!.longitude.toStringAsFixed(5)}',
               ),
               if (_selectedExtras.isNotEmpty) ...[
                 const Divider(color: ReflexColors.line, height: 20),
@@ -752,7 +907,10 @@ class _BookingScreenState extends State<BookingScreen> {
                 ),
               ],
               const SizedBox(height: 11),
-              const _StudioMapPreview(compact: true),
+              if (_location == 'Estudio Reflexcam')
+                const _StudioMapPreview(compact: true)
+              else
+                _ExternalLocationSummary(location: _selectedLocation),
             ],
           ),
         ),
@@ -821,7 +979,7 @@ class _BookingScreenState extends State<BookingScreen> {
               ),
               const SizedBox(height: 13),
               const Text(
-                'Transferencia bancaria, PSE o tarjeta de crédito. Puedes adjuntar tu comprobante ahora o después de reservar desde tu panel.',
+                'Paga el anticipo con Wompi por PSE, transferencia o tarjeta. El estudio confirmará la disponibilidad de la fecha.',
                 style: TextStyle(
                   color: ReflexColors.muted,
                   fontSize: 10,
@@ -861,6 +1019,7 @@ class _BookingScreenState extends State<BookingScreen> {
   Widget _buildActionArea() {
     final canContinue = switch (_step) {
       0 => _selectedServices.isNotEmpty,
+      2 => _location == 'Estudio Reflexcam' || _selectedLocation != null,
       3 => _termsAccepted,
       _ => true,
     };
@@ -868,7 +1027,7 @@ class _BookingScreenState extends State<BookingScreen> {
       0 => 'CONTINUAR A FECHA',
       1 => 'CONTINUAR',
       2 => 'CONTINUAR A RESUMEN',
-      _ => 'ENVIAR SOLICITUD DE RESERVA',
+      _ => 'PAGAR ANTICIPO (50%)',
     };
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 13),
@@ -878,7 +1037,10 @@ class _BookingScreenState extends State<BookingScreen> {
       ),
       child: Column(
         children: [
-          PrimaryButton(label: label, onPressed: canContinue ? _advance : null),
+          PrimaryButton(
+            label: _isSubmitting ? 'CONECTANDO CON WOMPI...' : label,
+            onPressed: canContinue && !_isSubmitting ? _advance : null,
+          ),
           const SizedBox(height: 6),
           Text(
             switch (_step) {
@@ -899,28 +1061,146 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
-  void _advance() {
+  Future<void> _advance() async {
     if (_step < 3) {
+      if (_step == 2 &&
+          _location == 'Mi negocio / Locación' &&
+          _selectedLocation == null) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text('Marca en el mapa dónde se realizará el trabajo.'),
+            ),
+          );
+        return;
+      }
       setState(() => _step++);
       return;
     }
     if (!_termsAccepted) return;
-    setState(() => _sent = true);
+    await _startCheckout();
+  }
+
+  Future<void> _startCheckout() async {
+    setState(() => _isSubmitting = true);
+    try {
+      final date = DateTime(
+        _displayedMonth.year,
+        _displayedMonth.month,
+        _selectedDay,
+      );
+      final time = _selectedTime.split(':');
+      final scheduledAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        int.parse(time[0]),
+        int.parse(time[1]),
+      );
+      final checkout = await widget.repository.createCheckout(
+        BookingRequest(
+          serviceIds: _services
+              .where((service) => _selectedServices.contains(service.title))
+              .map((service) => service.id)
+              .toList(),
+          extraIds: _extras
+              .where((extra) => _selectedExtras.contains(extra.title))
+              .map((extra) => extra.id)
+              .toList(),
+          scheduledAt: scheduledAt,
+          isExternalLocation: _location == 'Mi negocio / Locación',
+          address: _location == 'Estudio Reflexcam'
+              ? 'Calle 93 # 12-40, Piso 3, Bogotá, Colombia'
+              : _addressController.text.trim(),
+          latitude: _selectedLocation?.latitude,
+          longitude: _selectedLocation?.longitude,
+          logistics: _logisticsController.text.trim(),
+        ),
+      );
+      if (!await widget.repository.openCheckout(checkout.checkoutUrl)) {
+        throw StateError('No se pudo abrir el portal de pago de Wompi.');
+      }
+      if (mounted) setState(() => _checkout = checkout);
+    } on FirebaseFunctionsException catch (error) {
+      if (mounted) {
+        _showBookingError(
+          error.message ?? 'El servidor no pudo iniciar el pago.',
+        );
+      }
+    } catch (error) {
+      if (mounted) _showBookingError(error.toString());
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  void _showBookingError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text('No se pudo iniciar el pago: $message')),
+      );
   }
 
   void _changeMonth(int offset) {
+    final nextMonth = DateTime(
+      _displayedMonth.year,
+      _displayedMonth.month + offset,
+    );
+    final now = DateTime.now();
+    if (nextMonth.year < now.year ||
+        (nextMonth.year == now.year && nextMonth.month < now.month)) {
+      return;
+    }
     setState(() {
-      _displayedMonth = DateTime(
-        _displayedMonth.year,
-        _displayedMonth.month + offset,
-      );
+      _displayedMonth = nextMonth;
       if (_selectedDay > _daysInMonth) _selectedDay = _daysInMonth;
+      if (_isPastDate(_selectedDay)) {
+        _selectedDay = DateTime.now().day;
+      }
     });
+  }
+
+  bool get _isCurrentOrPastMonth {
+    final now = DateTime.now();
+    return _displayedMonth.year < now.year ||
+        (_displayedMonth.year == now.year &&
+            _displayedMonth.month <= now.month);
+  }
+
+  bool _isPastDate(int day) {
+    final today = DateTime.now();
+    return DateTime(
+      _displayedMonth.year,
+      _displayedMonth.month,
+      day,
+    ).isBefore(DateTime(today.year, today.month, today.day));
+  }
+
+  bool _isPastTime(String time) {
+    if (_isPastDate(_selectedDay)) return true;
+    final now = DateTime.now();
+    if (_displayedMonth.year != now.year ||
+        _displayedMonth.month != now.month ||
+        _selectedDay != now.day) {
+      return false;
+    }
+    final parts = time.split(':');
+    final slot = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+    );
+    return !slot.isAfter(now);
   }
 }
 
 class _BookingService {
   const _BookingService({
+    required this.id,
     required this.category,
     required this.title,
     required this.description,
@@ -930,6 +1210,7 @@ class _BookingService {
     required this.tag,
   });
 
+  final String id;
   final String category;
   final String title;
   final String description;
@@ -1082,13 +1363,13 @@ class _TimeSlot extends StatelessWidget {
   const _TimeSlot({
     required this.time,
     required this.selected,
-    required this.busy,
+    required this.disabled,
     required this.onTap,
   });
 
   final String time;
   final bool selected;
-  final bool busy;
+  final bool disabled;
   final VoidCallback? onTap;
 
   @override
@@ -1123,10 +1404,9 @@ class _TimeSlot extends StatelessWidget {
                 style: TextStyle(
                   color: selected
                       ? const Color(0xFF17120E)
-                      : busy
+                      : disabled
                       ? ReflexColors.muted.withValues(alpha: 0.35)
                       : ReflexColors.text,
-                  decoration: busy ? TextDecoration.lineThrough : null,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1333,6 +1613,42 @@ class _StudioMapPreview extends StatelessWidget {
                 ],
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExternalLocationSummary extends StatelessWidget {
+  const _ExternalLocationSummary({required this.location});
+
+  final LatLng? location;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedLocation = location;
+    return SurfaceCard(
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.push_pin_outlined,
+            color: ReflexColors.orange,
+            size: 18,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              selectedLocation == null
+                  ? 'No se ha marcado una ubicación.'
+                  : 'Punto marcado: ${selectedLocation.latitude.toStringAsFixed(5)}, ${selectedLocation.longitude.toStringAsFixed(5)}',
+              style: const TextStyle(
+                color: ReflexColors.text,
+                fontSize: 10,
+                height: 1.4,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1762,7 +2078,14 @@ class _PriceRow extends StatelessWidget {
 }
 
 class _ConfirmationScreen extends StatelessWidget {
-  const _ConfirmationScreen({required this.onComplete});
+  const _ConfirmationScreen({
+    required this.booking,
+    required this.repository,
+    required this.onComplete,
+  });
+
+  final BookingCheckout booking;
+  final BookingRepository repository;
   final VoidCallback onComplete;
 
   @override
@@ -1781,51 +2104,101 @@ class _ConfirmationScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(27),
               ),
               child: const Icon(
-                Icons.check_rounded,
-                color: ReflexColors.success,
+                Icons.payments_outlined,
+                color: ReflexColors.orange,
                 size: 43,
               ),
             ),
             const SizedBox(height: 22),
-            const Eyebrow('Solicitud enviada'),
+            const Eyebrow('Pago de anticipo'),
             const SizedBox(height: 9),
             Text(
-              'Tu momento\nempieza aquí.',
+              'Tu reserva\nestá en proceso.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge
                   ?.copyWith(fontSize: 28, height: 1.12),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'El equipo de ReflexCam revisará tu solicitud y se pondrá en contacto contigo para confirmar disponibilidad y pago.',
+            Text(
+              'Referencia ${booking.reference} · Anticipo \$${_formatPrice(booking.depositAmount)} COP',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: ReflexColors.muted,
                 height: 1.5,
-                fontSize: 13,
+                fontSize: 12,
               ),
             ),
             const SizedBox(height: 28),
-            const SurfaceCard(
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.schedule_rounded,
-                    color: ReflexColors.orange,
-                    size: 20,
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Te responderemos dentro de las próximas 24 horas.',
-                      style: TextStyle(
-                        color: ReflexColors.text,
-                        fontSize: 12,
-                        height: 1.4,
+            SurfaceCard(
+              child: StreamBuilder<String>(
+                stream: repository.watchPaymentStatus(booking.bookingId),
+                builder: (context, snapshot) {
+                  final status = snapshot.data;
+                  final message = snapshot.hasError
+                      ? 'No se pudo consultar el estado ahora. Inténtalo más tarde.'
+                      : switch (status) {
+                          'approved' => 'Pago aprobado. El estudio confirmará la disponibilidad de la fecha solicitada.',
+                          'failed' => 'Wompi no aprobó el pago. Contacta al estudio para continuar.',
+                          null => 'Esperando confirmación segura de Wompi...',
+                          _ => 'Pago pendiente. El estado se actualizará cuando Wompi confirme la transacción.',
+                        };
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            status == 'approved'
+                                ? Icons.check_circle_outline_rounded
+                                : status == 'failed'
+                                ? Icons.error_outline_rounded
+                                : Icons.sync_rounded,
+                            color: status == 'approved'
+                                ? Colors.green
+                                : ReflexColors.orange,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              message,
+                              style: const TextStyle(
+                                color: ReflexColors.text,
+                                fontSize: 12,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
-                ],
+                      if (status == 'pending' && !snapshot.hasError) ...[
+                        const SizedBox(height: 12),
+                        PrimaryButton(
+                          label: 'ABRIR WOMPI',
+                          onPressed: () async {
+                            try {
+                              if (!await repository.openCheckout(
+                                booking.checkoutUrl,
+                              )) {
+                                throw StateError(
+                                  'No se pudo abrir el portal de Wompi.',
+                                );
+                              }
+                            } catch (error) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(content: Text(error.toString())),
+                                );
+                            }
+                          },
+                          icon: Icons.open_in_new_rounded,
+                        ),
+                      ],
+                    ],
+                  );
+                },
               ),
             ),
             const SizedBox(height: 22),

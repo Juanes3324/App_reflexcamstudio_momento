@@ -26,18 +26,18 @@ class ReflexTheme {
       error: Color(0xFFFF6B6B),
     ),
     textTheme: const TextTheme(
-      bodyLarge: TextStyle(color: ReflexColors.text, fontSize: 15),
+      bodyLarge: TextStyle(color: ReflexColors.text, fontSize: 16),
       bodyMedium: TextStyle(color: ReflexColors.text, fontSize: 14),
       bodySmall: TextStyle(color: ReflexColors.muted, fontSize: 12),
       titleLarge: TextStyle(
         color: ReflexColors.text,
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: FontWeight.w800,
-        letterSpacing: -0.5,
+        letterSpacing: -0.7,
       ),
       titleMedium: TextStyle(
         color: ReflexColors.text,
-        fontSize: 17,
+        fontSize: 20,
         fontWeight: FontWeight.w700,
       ),
     ),
